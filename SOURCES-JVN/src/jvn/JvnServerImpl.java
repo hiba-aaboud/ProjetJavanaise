@@ -9,7 +9,10 @@
 
 package jvn;
 
+import java.rmi.Naming;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.io.*;
 
 
@@ -24,6 +27,10 @@ public class JvnServerImpl
 	private static final long serialVersionUID = 1L;
 	// A JVN server is managed as a singleton  
 	private static JvnServerImpl js = null;
+    private final JvnRemoteCoord coord;
+    private final ConcurrentMap<Integer, JvnObjectImpl> localObjects = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Integer> localNames = new ConcurrentHashMap<>();
+
 
   /**
   * Default constructor
@@ -31,7 +38,8 @@ public class JvnServerImpl
   **/
 	private JvnServerImpl() throws Exception {
 		super();
-		// to be completed
+        coord = (JvnRemoteCoord) Naming.lookup("rmi://localhost:1099/JvnCoord");
+        System.out.println("[JvnServer] Connected to JvnCoord");
 	}
 	
   /**
@@ -56,7 +64,14 @@ public class JvnServerImpl
 	**/
 	public  void jvnTerminate()
 	throws jvn.JvnException {
-    // to be completed 
+		 try {
+	            if (coord != null) {
+	            	coord.jvnTerminate(this);
+	            }
+	            System.out.println("[JvnServer] Terminated");
+	        } catch (Exception e) {
+	            throw new JvnException("jvnTerminate: " + e.getMessage());
+	        }
 	} 
 	
 	/**
@@ -67,7 +82,14 @@ public class JvnServerImpl
 	public  JvnObject jvnCreateObject(Serializable o)
 	throws jvn.JvnException { 
 		// to be completed 
-		return null; 
+		try {
+            int id = coord.jvnGetObjectId();
+            JvnObjectImpl jo = new JvnObjectImpl(id, o, this);
+            localObjects.put(id, jo);
+            return jo;
+        } catch (Exception e) {
+            throw new JvnException("jvnCreateObject: " + e.getMessage());
+        }
 	}
 	
 	/**
@@ -78,7 +100,13 @@ public class JvnServerImpl
 	**/
 	public  void jvnRegisterObject(String jon, JvnObject jo)
 	throws jvn.JvnException {
-		// to be completed 
+		try {
+            coord.jvnRegisterObject(jon, jo, this);
+            int id = jo.jvnGetObjectId();
+            localNames.put(jon, id);
+        } catch (Exception e) {
+            throw new JvnException("jvnRegisterObject: " + e.getMessage());
+        }
 	}
 	
 	/**
@@ -90,7 +118,17 @@ public class JvnServerImpl
 	public  JvnObject jvnLookupObject(String jon)
 	throws jvn.JvnException {
     // to be completed 
-		return null;
+		try {
+            JvnObject remoteJo = coord.jvnLookupObject(jon, this);
+            if (remoteJo == null) return null;
+            int id = remoteJo.jvnGetObjectId();
+            Serializable state = remoteJo.jvnGetSharedObject();
+            JvnObjectImpl localJo = new JvnObjectImpl(id, state, this);
+            localObjects.put(id, localJo);
+            return localJo;
+        } catch (Exception e) {
+            throw new JvnException("jvnLookupObject: " + e.getMessage());
+        }
 	}	
 	
 	/**
@@ -102,7 +140,15 @@ public class JvnServerImpl
    public Serializable jvnLockRead(int joi)
 	 throws JvnException {
 		// to be completed 
-		return null;
+	   try {
+           Serializable state = coord.jvnLockRead(joi, this);
+           if (state != null) {
+        	   localObjects.put(joi, new JvnObjectImpl(joi, state, this));
+           }
+           return state;
+       } catch (Exception e) {
+           throw new JvnException("jvnLockRead: " + e.getMessage());
+       }
 
 	}	
 	/**
@@ -114,7 +160,13 @@ public class JvnServerImpl
    public Serializable jvnLockWrite(int joi)
 	 throws JvnException {
 		// to be completed 
-		return null;
+	   try {
+           Serializable state = coord.jvnLockWrite(joi, this);
+           if (state != null) localObjects.put(joi, new JvnObjectImpl(joi, state, this));
+           return state;
+       } catch (Exception e) {
+           throw new JvnException("jvnLockWrite: " + e.getMessage());
+       }
 	}	
 
 	
@@ -127,7 +179,10 @@ public class JvnServerImpl
 	**/
   public void jvnInvalidateReader(int joi)
 	throws java.rmi.RemoteException,jvn.JvnException {
-		// to be completed 
+	  JvnObjectImpl local = localObjects.get(joi);
+      if (local != null) {
+          local.jvnInvalidateReader();
+      }
 	};
 	    
 	/**
@@ -139,7 +194,12 @@ public class JvnServerImpl
   public Serializable jvnInvalidateWriter(int joi)
 	throws java.rmi.RemoteException,jvn.JvnException { 
 		// to be completed 
-		return null;
+	  JvnObjectImpl local = localObjects.get(joi);
+      if (local != null) {
+          return local.jvnInvalidateWriter();
+      } else {
+          return null;
+      }
 	};
 	
 	/**
@@ -151,7 +211,12 @@ public class JvnServerImpl
    public Serializable jvnInvalidateWriterForReader(int joi)
 	 throws java.rmi.RemoteException,jvn.JvnException { 
 		// to be completed 
-		return null;
+	   JvnObjectImpl local = localObjects.get(joi);
+       if (local != null) {
+           return local.jvnInvalidateWriterForReader();
+       } else {
+           return null;
+       }
 	 };
 
 }

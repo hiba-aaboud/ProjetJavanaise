@@ -4,76 +4,86 @@ import java.io.Serializable;
 
 public class JvnObjectImpl implements JvnObject{
 
+    private static final long serialVersionUID = 1L;
+
 	public enum LockState {NL, RC, WC, R, W, RWC};
 	
-	private LockState lock = LockState.NL;
+	private LockState lockState = LockState.NL;
 	
-	private Serializable object;
+	private Serializable sharedObject;
+	
+	private transient JvnLocalServer server;
+	
+	private final int objectId;
+	
+	public JvnObjectImpl(int objectId, Serializable sharedObject, JvnLocalServer server) {
+	        this.objectId = objectId;
+	        this.sharedObject = sharedObject;
+	        this.server = server;
+	        this.lockState = LockState.NL;
+	    }
+	
+	public JvnObjectImpl(int objectId, Serializable sharedObject) {
+        this(objectId, sharedObject, null);
+    }
+
+    public void setServer(JvnLocalServer server) {
+        this.server = server;
+    }
 	
 	@Override
 	public void jvnLockRead() throws JvnException {
 		// TODO Auto-generated method stub
 		
-		if(lock == LockState.NL || lock == LockState.RC) {
-			lock = LockState.R;
+		if (server == null) {
+			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
 		}
-		else if(lock==LockState.WC || lock==LockState.RWC) {
-			lock = LockState.RWC;
-		}
+        Serializable s = server.jvnLockRead(objectId);
+        if (s != null) {
+        	this.sharedObject = s;
+        }
+        this.lockState = LockState.R;
 		
 	}
 
 	@Override
 	public void jvnLockWrite() throws JvnException {
 		// TODO Auto-generated method stub
-		
-		if(lock == LockState.NL || lock == LockState.RC || lock == LockState.WC ) {
-			lock = LockState.W;
+		if (server == null) {
+			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
 		}
+        Serializable s = server.jvnLockWrite(objectId);
+        if (s != null) {
+        	this.sharedObject = s;
+        }
+        this.lockState = LockState.W;
 		
 	}
 
 	@Override
 	public void jvnUnLock() throws JvnException {
 		// TODO Auto-generated method stub
-		
-		if(lock == LockState.R) {
-			lock = LockState.RC;
-		}
-		else if(lock == LockState.W) {
-			lock = LockState.WC;
-		}
-		
+		this.lockState = LockState.NL;	
 	}
 
 	@Override
 	public int jvnGetObjectId() throws JvnException {
 		// TODO Auto-generated method stub
-		return 0;
+		return objectId;
 	}
 
 	@Override
 	public Serializable jvnGetSharedObject() throws JvnException {
 		// TODO Auto-generated method stub
-		return null;
+		return sharedObject;
 	}
 
 	@Override
 	public void jvnInvalidateReader() throws JvnException {
 		// TODO Auto-generated method stub
 		
-		while(lock == LockState.R || lock == LockState.RWC) {
-			try {
-				wait();
-			} catch (InterruptedException e) {
-				
-				e.printStackTrace();
-			}
-		}
-		
-		if(lock == LockState.RC) {
-			lock = LockState.NL;
-		}
+		this.sharedObject = null;
+        this.lockState = LockState.NL;
 		
 	}
 
@@ -81,44 +91,18 @@ public class JvnObjectImpl implements JvnObject{
 	public Serializable jvnInvalidateWriter() throws JvnException {
 		// TODO Auto-generated method stub
 		
-		while(lock == LockState.W) {
-			try {
-				wait();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		
-		Serializable ser = null;
-		
-		if(lock == LockState.WC) {
-			ser = object;
-			lock = LockState.NL;
-		}
-		return ser;
+		 Serializable s = this.sharedObject;
+	     this.sharedObject = null;
+	     this.lockState = LockState.NL;
+	     return s;
 	}
 
 	@Override
 	public Serializable jvnInvalidateWriterForReader() throws JvnException {
 		// TODO Auto-generated method stub
-		
-		while(lock == LockState.W) {
-		   try {
-			wait();
-		   } catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		   }
-		}
-		Serializable ser = null;
-		
-		if(lock == LockState.WC ||  lock == LockState.RWC) {
-			ser = object;
-			lock = LockState.RC;
-		}
-		
-		return ser;
+		Serializable s = this.sharedObject;
+        this.lockState = LockState.R;
+        return s;
 	}
 
 }
