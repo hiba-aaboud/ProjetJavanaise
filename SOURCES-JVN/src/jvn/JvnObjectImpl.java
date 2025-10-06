@@ -2,6 +2,8 @@ package jvn;
 
 import java.io.Serializable;
 
+import irc.Sentence;
+
 public class JvnObjectImpl implements JvnObject{
 
     private static final long serialVersionUID = 1L;
@@ -30,40 +32,67 @@ public class JvnObjectImpl implements JvnObject{
     public void setServer(JvnLocalServer server) {
         this.server = server;
     }
+
+
+
 	
 	@Override
 	public void jvnLockRead() throws JvnException {
 		// TODO Auto-generated method stub
-		
+		Serializable s = null;
+
 		if (server == null) {
 			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
 		}
-        Serializable s = server.jvnLockRead(objectId);
+		if (lockState == LockState.RC){
+			this.lockState = LockState.R;
+	
+		}
+		if (lockState == LockState.NL) {
+			s = server.jvnLockRead(objectId);	
+		}
+
+		if(lockState == LockState.WC) {
+			this.lockState = LockState.RWC;
+		}
+        
         if (s != null) {
         	this.sharedObject = s;
         }
-        this.lockState = LockState.R;
+
+       
 		
 	}
-
 	@Override
 	public void jvnLockWrite() throws JvnException {
 		// TODO Auto-generated method stub
+		Serializable s = null;
 		if (server == null) {
 			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
 		}
-        Serializable s = server.jvnLockWrite(objectId);
+		if (lockState == LockState.NL || lockState==LockState.RC){
+			s = server.jvnLockWrite(objectId);
+		}
+		if(lockState==LockState.WC || lockState==LockState.RWC){
+			this.lockState= LockState.W;
+		}
         if (s != null) {
         	this.sharedObject = s;
         }
-        this.lockState = LockState.W;
 		
 	}
 
 	@Override
 	public void jvnUnLock() throws JvnException {
-		// TODO Auto-generated method stub
-		this.lockState = LockState.NL;	
+		// TODO Auto-generated method stub				
+		if(lockState == LockState.R){
+	    	lockState = LockState.RC;
+	    }else if(lockState == LockState.W || lockState == LockState.RWC)
+	    {
+	    	lockState = LockState.WC; 
+	    }
+
+		notifyAll();
 	}
 
 	@Override
@@ -82,9 +111,19 @@ public class JvnObjectImpl implements JvnObject{
 	public void jvnInvalidateReader() throws JvnException {
 		// TODO Auto-generated method stub
 		
-		this.sharedObject = null;
-        this.lockState = LockState.NL;
-		
+		while(lockState == LockState.R ) {
+			try {
+				wait();
+			} catch (InterruptedException e) {
+				
+				e.printStackTrace();
+			}
+		}
+		lockState = LockState.NL;
+
+	if(lockState == LockState.RC){
+		lockState = LockState.NL;
+	}
 	}
 
 	@Override
