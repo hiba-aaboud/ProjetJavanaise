@@ -15,7 +15,8 @@ public class TestLookupRead {
         }
         jvnO.jvnLockRead();
         MySharedObject o = (MySharedObject) jvnO.jvnGetSharedObject();
-        System.out.println("[JVM2] lecture objet: " + o);
+        System.out.println("[JVM2] lecture objet: " + o.getValue());
         jvnO.jvnUnLock();
+        Thread.sleep(60_000);
     }
 }

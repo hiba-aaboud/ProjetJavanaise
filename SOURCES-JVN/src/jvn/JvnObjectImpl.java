@@ -2,8 +2,6 @@ package jvn;
 
 import java.io.Serializable;
 
-import irc.Sentence;
-
 public class JvnObjectImpl implements JvnObject{
 
     private static final long serialVersionUID = 1L;
@@ -32,77 +30,123 @@ public class JvnObjectImpl implements JvnObject{
     public void setServer(JvnLocalServer server) {
         this.server = server;
     }
+    
+    void setLocalLockState(LockState s) {
+        this.lockState = s;
+    }
 
+    
+    
+    @Override
+    public synchronized void jvnLockRead() throws jvn.JvnException {
+        if (server == null) throw new JvnException("Serveur local manquant dans JvnObjectImpl");
 
-
-	
-	@Override
-	public void jvnLockRead() throws JvnException {
-		// TODO Auto-generated method stub
-		Serializable s = null;
-
-		if (server == null) {
-			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
-		}
-		if (lockState == LockState.RC){
-			this.lockState = LockState.R;
-	
-		}
-		if (lockState == LockState.NL) {
-			s = server.jvnLockRead(objectId);	
-		}
-
-		if(lockState == LockState.WC) {
-			this.lockState = LockState.RWC;
-		}
-        
-        if (s != null) {
-        	this.sharedObject = s;
+        switch (lockState) {
+            case NL: {
+                // Pas de copie locale : demander au coord via le serveur local
+                Serializable s = server.jvnLockRead(objectId);
+                if (s != null) this.sharedObject = s;
+                lockState = LockState.R;
+                break;
+            }
+            case RC:
+                lockState = LockState.R;
+                break;
+            case R:
+                break;
+            case WC:
+                lockState = LockState.RWC;
+                break;
+            case W:
+                break; // write active on ne peux pas lire
+            case RWC:
+                break;
+            default:
+                Serializable s2 = server.jvnLockRead(objectId);
+                if (s2 != null) this.sharedObject = s2;
+                lockState = LockState.R;
+                break;
         }
+    }
 
-       
-		
-	}
-	@Override
-	public void jvnLockWrite() throws JvnException {
-		// TODO Auto-generated method stub
-		Serializable s = null;
-		if (server == null) {
-			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
-		}
-		if (lockState == LockState.NL || lockState==LockState.RC){
-			s = server.jvnLockWrite(objectId);
-		}
-		if(lockState==LockState.WC || lockState==LockState.RWC){
-			this.lockState= LockState.W;
-		}
-        if (s != null) {
-        	this.sharedObject = s;
+
+    @Override
+    public synchronized void jvnLockWrite() throws jvn.JvnException {
+        if (server == null) throw new JvnException("Serveur local manquant dans JvnObjectImpl");
+
+        switch (lockState) {
+            case NL: {
+                Serializable s = server.jvnLockWrite(objectId);
+                if (s != null) this.sharedObject = s;
+                lockState = LockState.W;
+                break;
+            }
+            case RC: {
+             
+                Serializable s2 = server.jvnLockWrite(objectId);
+                if (s2 != null) this.sharedObject = s2;
+                lockState = LockState.W;
+                break;
+            }
+            case R: {
+                // lecture active -> demander upgrade vers write
+                Serializable s3 = server.jvnLockWrite(objectId);
+                if (s3 != null) this.sharedObject = s3;
+                lockState = LockState.W;
+                break;
+            }
+            case WC:
+                
+                lockState = LockState.W;
+                break;
+            case W:
+                
+                break;
+            case RWC:
+                
+                lockState = LockState.W;
+                break;
+            default: {
+                Serializable s4 = server.jvnLockWrite(objectId);
+                if (s4 != null) this.sharedObject = s4;
+                lockState = LockState.W;
+                break;
+            }
         }
-		
-	}
+    }
 
+    @Override
+    public synchronized void jvnUnLock() throws jvn.JvnException {
+        switch (lockState) {
+            case R:
+                lockState = LockState.RC;
+                break;
+            case W:
+                lockState = LockState.WC;
+                break;
+            case RWC:
+                lockState = LockState.WC;
+                break;
+            case RC:
+            case WC:
+            case NL:
+            default:
+                
+                break;
+        }
+        // Réveiller les threads qui attendent la fin d'un accès actif (invalidate)
+        notifyAll();
+    }
+    
+    
 	@Override
-	public void jvnUnLock() throws JvnException {
-		// TODO Auto-generated method stub				
-		if(lockState == LockState.R){
-	    	lockState = LockState.RC;
-	    }else if(lockState == LockState.W || lockState == LockState.RWC)
-	    {
-	    	lockState = LockState.WC; 
-	    }
-
-		notifyAll();
-	}
-
-	@Override
-	public int jvnGetObjectId() throws JvnException {
+	public synchronized int jvnGetObjectId() throws JvnException {
 		// TODO Auto-generated method stub
 		return objectId;
 	}
 
 	@Override
-	public Serializable jvnGetSharedObject() throws JvnException {
+	public synchronized Serializable jvnGetSharedObject() throws JvnException {
 		// TODO Auto-generated method stub
 		return sharedObject;
 	}
@@ -111,7 +155,7 @@ public class JvnObjectImpl implements JvnObject{
 	public void jvnInvalidateReader() throws JvnException {
 		// TODO Auto-generated method stub
 		
-		while(lockState == LockState.R ) {
+		while(lockState == LockState.R || lockState == LockState.RWC) {
 			try {
 				wait();
 			} catch (InterruptedException e) {
@@ -124,24 +168,45 @@ public class JvnObjectImpl implements JvnObject{
 	if(lockState == LockState.RC){
 		lockState = LockState.NL;
 	}
+	this.sharedObject = null;
 	}
 
 	@Override
-	public Serializable jvnInvalidateWriter() throws JvnException {
+	public synchronized Serializable jvnInvalidateWriter() throws JvnException {
 		// TODO Auto-generated method stub
 		
-		 Serializable s = this.sharedObject;
-	     this.sharedObject = null;
-	     this.lockState = LockState.NL;
-	     return s;
+		 while (lockState == LockState.W) {
+	            try {
+	                wait();
+	            } catch (InterruptedException e) {
+					
+					e.printStackTrace();
+				}
+	        }
+	        // On renvoie l'état courant 
+	        Serializable s = this.sharedObject;
+	        this.sharedObject = null;
+	        this.lockState = LockState.NL;
+	        return s;
+		 
 	}
 
 	@Override
-	public Serializable jvnInvalidateWriterForReader() throws JvnException {
+	public synchronized Serializable jvnInvalidateWriterForReader() throws JvnException {
 		// TODO Auto-generated method stub
-		Serializable s = this.sharedObject;
+		while (lockState == LockState.W) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+				
+				e.printStackTrace();
+			}
+        }
+        // Retourner l'état et réduire on passe a read
+        Serializable s = this.sharedObject;
         this.lockState = LockState.R;
         return s;
-	}
+    }
 
 }
+
