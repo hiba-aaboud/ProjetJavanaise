@@ -7,22 +7,18 @@ import irc.Sentence;
 public class JvnObjectImpl implements JvnObject{
 
     private static final long serialVersionUID = 1L;
-
 	public enum LockState {NL, RC, WC, R, W, RWC};
-	
 	private LockState lockState = LockState.NL;
-	
 	private Serializable sharedObject;
-	
 	private transient JvnLocalServer server;
-	
 	private final int objectId;
 	
 	public JvnObjectImpl(int objectId, Serializable sharedObject, JvnLocalServer server) {
 	        this.objectId = objectId;
 	        this.sharedObject = sharedObject;
 	        this.server = server;
-	        this.lockState = LockState.NL;
+            //if on an inital state on le considere en lecture cache
+            this.lockState = (sharedObject != null) ? LockState.RC : LockState.NL;
 	    }
 	
 	public JvnObjectImpl(int objectId, Serializable sharedObject) {
@@ -33,115 +29,159 @@ public class JvnObjectImpl implements JvnObject{
         this.server = server;
     }
 
-
-
-	
 	@Override
-	public void jvnLockRead() throws JvnException {
+	public synchronized void jvnLockRead() throws JvnException {
 		// TODO Auto-generated method stub
 		Serializable s = null;
 
-		if (server == null) {
-			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
-		}
-		if (lockState == LockState.RC){
-			this.lockState = LockState.R;
-	
-		}
-		if (lockState == LockState.NL) {
-			s = server.jvnLockRead(objectId);	
-		}
-
-		if(lockState == LockState.WC) {
-			this.lockState = LockState.RWC;
-		}
-        
-        if (s != null) {
-        	this.sharedObject = s;
+//		if (server == null) {
+//			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
+//		}
+        switch (this.lockState) {
+            case NL:
+                s = server.jvnLockRead(objectId);
+                if (s != null) sharedObject = s;
+                this.lockState = LockState.R;
+                break;
+            case RC:
+                this.lockState = LockState.R;
+                break;
+            case WC:
+                this.lockState = LockState.RWC;
+                break;
+            case R:
+                //rien a faire
+                break;
+            case W:
+                //deja en ecriture
+                break;
+            case RWC:
+                //same
+                break;
         }
-
-       
-		
+        }
 	}
 	@Override
-	public void jvnLockWrite() throws JvnException {
+	public synchronized void jvnLockWrite() throws JvnException {
 		// TODO Auto-generated method stub
-		Serializable s = null;
-		if (server == null) {
-			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
-		}
-		if (lockState == LockState.NL || lockState==LockState.RC){
-			s = server.jvnLockWrite(objectId);
-		}
-		if(lockState==LockState.WC || lockState==LockState.RWC){
-			this.lockState= LockState.W;
-		}
-        if (s != null) {
-        	this.sharedObject = s;
+        Serializable s = null;
+        switch (lockState) {
+            case NL:
+                s = server.jvnLockWrite(objectId);
+                if (s != null) sharedObject = s;
+                lockState = LockState.W;
+                break;
+            case RC:
+                s = server.jvnLockWrite(objectId);
+                if (s != null) sharedObject = s;
+                lockState = LockState.W;
+                break;
+            case WC:
+                lockState = LockState.W;
+                break;
+            case RWC:
+                lockState = LockState.W;
+                break;
+            case W:
+                break;
+            case R:
+                break;
         }
-		
 	}
 
 	@Override
-	public void jvnUnLock() throws JvnException {
+	public synchronized void jvnUnLock() throws JvnException {
 		// TODO Auto-generated method stub				
-		if(lockState == LockState.R){
-	    	lockState = LockState.RC;
-	    }else if(lockState == LockState.W || lockState == LockState.RWC)
-	    {
-	    	lockState = LockState.WC; 
-	    }
-
-		notifyAll();
+        switch (lockState) {
+            case R:
+                lockState = LockState.RC;
+                break;
+            case W:
+                lockState = LockState.WC;
+                break;
+            case RWC:
+                lockState = LockState.WC;
+                break;
+            default:
+                break;
+        }
+        notifyAll();
 	}
 
 	@Override
-	public int jvnGetObjectId() throws JvnException {
+	public synchronized int jvnGetObjectId() throws JvnException {
 		// TODO Auto-generated method stub
 		return objectId;
 	}
 
 	@Override
-	public Serializable jvnGetSharedObject() throws JvnException {
+	public synchronized Serializable jvnGetSharedObject() throws JvnException {
 		// TODO Auto-generated method stub
 		return sharedObject;
 	}
 
-	@Override
-	public void jvnInvalidateReader() throws JvnException {
-		// TODO Auto-generated method stub
-		
-		while(lockState == LockState.R ) {
-			try {
-				wait();
-			} catch (InterruptedException e) {
-				
-				e.printStackTrace();
-			}
-		}
-		lockState = LockState.NL;
+    @Override
+    public synchronized void jvnInvalidateReader() throws JvnException {
+        if(lockState == LockState.RC){
+            lockState = LockState.NL;
+        } else if(lockState == LockState.R || lockState == LockState.RWC ){
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            lockState = LockState.NL;
+        }
+    }
 
-	if(lockState == LockState.RC){
-		lockState = LockState.NL;
-	}
-	}
 
 	@Override
-	public Serializable jvnInvalidateWriter() throws JvnException {
+	public synchronized Serializable jvnInvalidateWriter() throws JvnException {
 		// TODO Auto-generated method stub
-		
 		 Serializable s = this.sharedObject;
 	     this.sharedObject = null;
-	     this.lockState = LockState.NL;
-	     return s;
+        switch (this.lockState) {
+            case RWC:
+                this.lockState = LockState.NL;
+                break;
+            case W:
+                try {
+                    this.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                this.lockState = LockState.NL;
+            case WC:
+                this.lockState = LockState.NL;
+                break;
+            default:
+                throw new JvnException("error");
+        }
+        return s;
 	}
 
 	@Override
-	public Serializable jvnInvalidateWriterForReader() throws JvnException {
+	public synchronized Serializable jvnInvalidateWriterForReader() throws JvnException {
 		// TODO Auto-generated method stub
 		Serializable s = this.sharedObject;
-        this.lockState = LockState.R;
+        switch (this.lockState) {
+            case RWC:
+                this.lockState = LockState.RC;
+                break;
+            case W:
+                try {
+                    this.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                this.lockState = LockState.RC;
+            case WC:
+                this.lockState = LockState.RC;
+                break;
+
+            default:
+                throw new JvnException("error");
+        }
         return s;
-	}
 
 }
