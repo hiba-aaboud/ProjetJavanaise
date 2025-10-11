@@ -8,7 +8,7 @@ public class JvnObjectImpl implements JvnObject{
 
     private static final long serialVersionUID = 1L;
 	public enum LockState {NL, RC, WC, R, W, RWC};
-	private LockState lockState = LockState.NL;
+	private LockState lockState;
 	private Serializable sharedObject;
 	private transient JvnLocalServer server;
 	private final int objectId;
@@ -28,7 +28,9 @@ public class JvnObjectImpl implements JvnObject{
     public void setServer(JvnLocalServer server) {
         this.server = server;
     }
-
+    void setLocalLockState(LockState s) {
+        this.lockState = s;
+    }
 	@Override
 	public synchronized void jvnLockRead() throws JvnException {
 		// TODO Auto-generated method stub
@@ -60,27 +62,19 @@ public class JvnObjectImpl implements JvnObject{
                 break;
         }
         }
-	}
+
 	@Override
 	public synchronized void jvnLockWrite() throws JvnException {
 		// TODO Auto-generated method stub
         Serializable s = null;
-        switch (lockState) {
-            case NL:
+        switch (this.lockState) {
+            case NL, RC:
                 s = server.jvnLockWrite(objectId);
                 if (s != null) sharedObject = s;
-                lockState = LockState.W;
+                this.lockState = LockState.W;
                 break;
-            case RC:
-                s = server.jvnLockWrite(objectId);
-                if (s != null) sharedObject = s;
-                lockState = LockState.W;
-                break;
-            case WC:
-                lockState = LockState.W;
-                break;
-            case RWC:
-                lockState = LockState.W;
+            case WC, RWC:
+                this.lockState = LockState.W;
                 break;
             case W:
                 break;
@@ -92,15 +86,12 @@ public class JvnObjectImpl implements JvnObject{
 	@Override
 	public synchronized void jvnUnLock() throws JvnException {
 		// TODO Auto-generated method stub				
-        switch (lockState) {
+        switch (this.lockState) {
             case R:
-                lockState = LockState.RC;
+                this.lockState = LockState.RC;
                 break;
-            case W:
-                lockState = LockState.WC;
-                break;
-            case RWC:
-                lockState = LockState.WC;
+            case W, RWC:
+                this.lockState = LockState.WC;
                 break;
             default:
                 break;
@@ -122,15 +113,15 @@ public class JvnObjectImpl implements JvnObject{
 
     @Override
     public synchronized void jvnInvalidateReader() throws JvnException {
-        if(lockState == LockState.RC){
-            lockState = LockState.NL;
-        } else if(lockState == LockState.R || lockState == LockState.RWC ){
+        if(this.lockState == LockState.RC){
+            this.lockState = LockState.NL;
+        } else if(this.lockState == LockState.R || this.lockState == LockState.RWC ){
             try {
                 this.wait();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            lockState = LockState.NL;
+            this.lockState = LockState.NL;
         }
     }
 
@@ -162,8 +153,8 @@ public class JvnObjectImpl implements JvnObject{
 
 	@Override
 	public synchronized Serializable jvnInvalidateWriterForReader() throws JvnException {
-		// TODO Auto-generated method stub
-		Serializable s = this.sharedObject;
+        // TODO Auto-generated method stub
+        Serializable s = this.sharedObject;
         switch (this.lockState) {
             case RWC:
                 this.lockState = LockState.RC;
@@ -184,4 +175,4 @@ public class JvnObjectImpl implements JvnObject{
         }
         return s;
 
-}
+    }}
