@@ -33,9 +33,5 @@ public class JvnException extends Exception {
 		return message;
 	}
 	
-	@Override
-	public String toString() {
-		return "JvnException: " + getMessage();
-		
-	}
+	
 }

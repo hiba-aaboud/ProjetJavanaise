@@ -85,12 +85,14 @@ public class JvnServerImpl
 		try {
             int id = coord.jvnGetObjectId();
             JvnObjectImpl jo = new JvnObjectImpl(id, o, this);
+            jo.setLocalLockState(JvnObjectImpl.LockState.WC);
             localObjects.put(id, jo);
             return jo;
         } catch (Exception e) {
             throw new JvnException("jvnCreateObject: " + e.getMessage());
         }
 	}
+	
 	
 	/**
 	*  Associate a symbolic name with a JVN object
@@ -124,6 +126,7 @@ public class JvnServerImpl
             int id = remoteJo.jvnGetObjectId();
             Serializable state = remoteJo.jvnGetSharedObject();
             JvnObjectImpl localJo = new JvnObjectImpl(id, state, this);
+            localJo.setLocalLockState(JvnObjectImpl.LockState.RC);
             localObjects.put(id, localJo);
             return localJo;
         } catch (Exception e) {
