@@ -8,12 +8,17 @@ public class TestLookupRead {
 		
 	public static void main(String[] args) throws Exception {
         JvnServerImpl js = JvnServerImpl.jvnGetServer();
+        if(js==null){
+            System.out.println("[js] pas trouvé");
+            return;
+        }
         JvnObject jvnO = js.jvnLookupObject("MyObject");
         if (jvnO == null) {
             System.out.println("[JVM2] objet pas trouvé");
             return;
         }
         jvnO.jvnLockRead();
+        System.out.println("got lock read");
         MySharedObject o = (MySharedObject) jvnO.jvnGetSharedObject();
         System.out.println("[JVM2] lecture objet: " + o.getValue());
         jvnO.jvnUnLock();

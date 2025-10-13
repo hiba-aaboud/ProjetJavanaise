@@ -134,6 +134,7 @@ public class JvnCoordImpl
    throws java.rmi.RemoteException, JvnException{
     // to be completed
 	   ObjectMeta meta = idToMeta.get(joi);
+       System.out.println("valeur du local reader:"+ meta);
        if (meta == null) throw new JvnException("id Objet  " + joi + " Pas trouvé");
        synchronized (meta) {
            if (meta.getWriter() != null && !meta.getWriter().equals(js)) {

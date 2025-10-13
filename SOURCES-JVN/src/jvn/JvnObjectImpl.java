@@ -12,13 +12,13 @@ public class JvnObjectImpl implements JvnObject{
 	private Serializable sharedObject;
 	private transient JvnLocalServer server;
 	private final int objectId;
+
 	
 	public JvnObjectImpl(int objectId, Serializable sharedObject, JvnLocalServer server) {
 	        this.objectId = objectId;
 	        this.sharedObject = sharedObject;
 	        this.server = server;
-            //if on an inital state on le considere en lecture cache
-            this.lockState = (sharedObject != null) ? LockState.RC : LockState.NL;
+            this.lockState = LockState.NL;
 	    }
 	
 	public JvnObjectImpl(int objectId, Serializable sharedObject) {
@@ -31,17 +31,19 @@ public class JvnObjectImpl implements JvnObject{
     void setLocalLockState(LockState s) {
         this.lockState = s;
     }
-	@Override
+    public synchronized void overwriteSharedObject(Serializable s) {
+        this.sharedObject = s;
+    }
+
+    @Override
 	public synchronized void jvnLockRead() throws JvnException {
 		// TODO Auto-generated method stub
 		Serializable s = null;
-
-//		if (server == null) {
-//			throw new JvnException("Serveur local manquant dans JvnObjectImpl");
-//		}
+        System.out.println("etat lock inital :" + this.lockState);
+        System.out.println("id de notre objet read" + this.jvnGetObjectId());
         switch (this.lockState) {
             case NL:
-                s = server.jvnLockRead(objectId);
+                s = server.jvnLockRead(this.jvnGetObjectId());
                 if (s != null) sharedObject = s;
                 this.lockState = LockState.R;
                 break;
@@ -61,15 +63,18 @@ public class JvnObjectImpl implements JvnObject{
                 //same
                 break;
         }
+        System.out.println("etat lock final read :" + this.lockState);
         }
 
 	@Override
 	public synchronized void jvnLockWrite() throws JvnException {
 		// TODO Auto-generated method stub
+        System.out.println("etat lock write :" + this.lockState);
         Serializable s = null;
+        System.out.println("id de notre objet" + this.jvnGetObjectId());
         switch (this.lockState) {
             case NL, RC:
-                s = server.jvnLockWrite(objectId);
+                s = server.jvnLockWrite(this.jvnGetObjectId());
                 if (s != null) sharedObject = s;
                 this.lockState = LockState.W;
                 break;
@@ -79,8 +84,12 @@ public class JvnObjectImpl implements JvnObject{
             case W:
                 break;
             case R:
+                s = server.jvnLockWrite(this.jvnGetObjectId());
+                if (s != null) sharedObject = s;
+                this.lockState = LockState.W;
                 break;
         }
+        System.out.println("etat lock write final :" + this.lockState);
 	}
 
 	@Override
@@ -113,17 +122,28 @@ public class JvnObjectImpl implements JvnObject{
 
     @Override
     public synchronized void jvnInvalidateReader() throws JvnException {
-        if(this.lockState == LockState.RC){
-            this.lockState = LockState.NL;
-        } else if(this.lockState == LockState.R || this.lockState == LockState.RWC ){
-            try {
-                this.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            this.lockState = LockState.NL;
+
+        if (lockState == LockState.RC) {
+            lockState = LockState.NL;
+            return;
         }
+
+        if (lockState == LockState.R || lockState == LockState.RWC) {
+            try {
+
+                while (lockState == LockState.R || lockState == LockState.RWC) {
+                    wait();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new JvnException("interrupted", e);
+            }
+            lockState = LockState.NL;
+            return;
+        }
+
     }
+
 
 
 	@Override
@@ -136,15 +156,18 @@ public class JvnObjectImpl implements JvnObject{
                 this.lockState = LockState.NL;
                 break;
             case W:
-                try {
-                    this.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                while (this.lockState == LockState.W) {
+                    try { this.wait(); } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new JvnException("Interrupted", e);
+                    }
                 }
                 this.lockState = LockState.NL;
+                break;
             case WC:
                 this.lockState = LockState.NL;
                 break;
+
             default:
                 throw new JvnException("error");
         }
@@ -154,19 +177,24 @@ public class JvnObjectImpl implements JvnObject{
 	@Override
 	public synchronized Serializable jvnInvalidateWriterForReader() throws JvnException {
         // TODO Auto-generated method stub
+        System.out.println("etat :" + this.lockState);
         Serializable s = this.sharedObject;
         switch (this.lockState) {
             case RWC:
                 this.lockState = LockState.RC;
                 break;
             case W:
-                try {
-                    this.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                while (this.lockState == LockState.W) {
+                    try { this.wait(); } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new JvnException("Interrupted", e);
+                    }
                 }
+                System.out.println("etat W" + this.jvnGetObjectId());
                 this.lockState = LockState.RC;
+                break;
             case WC:
+                System.out.println("etat WC" + this.jvnGetObjectId());
                 this.lockState = LockState.RC;
                 break;
 

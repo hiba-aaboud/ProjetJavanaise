@@ -28,8 +28,11 @@ public class JvnException extends Exception {
 	public JvnException(Throwable cause) {
 		super(cause);
 	}
-  
-	public String getMessage(){
+
+    public JvnException(String interrupted, InterruptedException e) {
+    }
+
+    public String getMessage(){
 		return message;
 	}
 	

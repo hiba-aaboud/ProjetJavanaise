@@ -20,7 +20,7 @@ public class TestWriteThenReadCache {
         jvnO.jvnLockWrite();
         
         MySharedObject o = (MySharedObject) jvnO.jvnGetSharedObject();
-        
+        System.out.println("got lock read " + o.getValue());
         if (o == null) {
             
             o = new MySharedObject("Modifie par JVM3");
@@ -31,6 +31,7 @@ public class TestWriteThenReadCache {
 
         jvnO.jvnUnLock();
         System.out.println("[JVM3] write terminé, jvnUnLock()");
+        System.out.println("[JVM3] etat lock ");
         Thread.sleep(60_000);
     }
 }

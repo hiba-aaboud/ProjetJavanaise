@@ -85,7 +85,7 @@ public class JvnServerImpl
 		try {
             int id = coord.jvnGetObjectId();
             JvnObjectImpl jo = new JvnObjectImpl(id, o, this);
-            jo.setLocalLockState(JvnObjectImpl.LockState.WC);
+            //jo.setLocalLockState(JvnObjectImpl.LockState.WC);
             localObjects.put(id, jo);
             return jo;
         } catch (Exception e) {
@@ -105,7 +105,9 @@ public class JvnServerImpl
 		try {
             coord.jvnRegisterObject(jon, jo, this);
             int id = jo.jvnGetObjectId();
+            System.out.print("id object = " + id);
             localNames.put(jon, id);
+            System.out.print("name object = " + jon);
         } catch (Exception e) {
             throw new JvnException("jvnRegisterObject: " + e.getMessage());
         }
@@ -126,7 +128,7 @@ public class JvnServerImpl
             int id = remoteJo.jvnGetObjectId();
             Serializable state = remoteJo.jvnGetSharedObject();
             JvnObjectImpl localJo = new JvnObjectImpl(id, state, this);
-            localJo.setLocalLockState(JvnObjectImpl.LockState.RC);
+            //localJo.setLocalLockState(JvnObjectImpl.LockState.RC);
             localObjects.put(id, localJo);
             return localJo;
         } catch (Exception e) {
@@ -142,18 +144,24 @@ public class JvnServerImpl
 	**/
    public Serializable jvnLockRead(int joi)
 	 throws JvnException {
-		// to be completed 
+		// to be completed
 	   try {
+           System.out.println("valeur du local hello :");
+
            Serializable state = coord.jvnLockRead(joi, this);
+           System.out.println("valeur du local state :"+ state);
+           JvnObjectImpl local = localObjects.get(joi);
+           System.out.println("valeur du local reader :"+ local);
            if (state != null) {
-        	   localObjects.put(joi, new JvnObjectImpl(joi, state, this));
+        	   local.overwriteSharedObject(state);
            }
            return state;
        } catch (Exception e) {
            throw new JvnException("jvnLockRead: " + e.getMessage());
        }
 
-	}	
+	}
+
 	/**
 	* Get a Write lock on a JVN object 
 	* @param joi : the JVN object identification
@@ -165,7 +173,9 @@ public class JvnServerImpl
 		// to be completed 
 	   try {
            Serializable state = coord.jvnLockWrite(joi, this);
-           if (state != null) localObjects.put(joi, new JvnObjectImpl(joi, state, this));
+           JvnObjectImpl local = localObjects.get(joi);
+           System.out.println("valeur du local :"+ local);
+           if (state != null) local.overwriteSharedObject(state);
            return state;
        } catch (Exception e) {
            throw new JvnException("jvnLockWrite: " + e.getMessage());
@@ -215,6 +225,7 @@ public class JvnServerImpl
 	 throws java.rmi.RemoteException,jvn.JvnException { 
 		// to be completed 
 	   JvnObjectImpl local = localObjects.get(joi);
+       System.out.println("valeur du local :"+ local);
        if (local != null) {
            return local.jvnInvalidateWriterForReader();
        } else {
