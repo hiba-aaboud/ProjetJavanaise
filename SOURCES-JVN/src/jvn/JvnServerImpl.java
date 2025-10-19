@@ -13,6 +13,9 @@ import java.rmi.Naming;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
+import proxy.JvnProxyFactory;
+
 import java.io.*;
 
 
@@ -232,6 +235,55 @@ public class JvnServerImpl
            return null;
        }
 	 };
+	 
+	
+	 public <T> T jvnCreateProxy(Serializable real, Class<T> iface) throws jvn.JvnException {
+	        JvnObject jo = jvnCreateObject(real);
+	        int id;
+	        try {
+	            id = jo.jvnGetObjectId();
+	        } catch (JvnException e) {
+	            throw new jvn.JvnException(e.getMessage());
+	        }
+	        JvnObjectImpl impl = localObjects.get(id);
+	        if (impl == null) throw new jvn.JvnException("internal error: created object not found");
+	        impl.setLocalLockState(JvnObjectImpl.LockState.WC);
+	        return JvnProxyFactory.createProxy(impl, iface);
+	    }
+	 
+	 
+	 
+	 public <T> T jvnLookupProxy(String jon, Class<T> iface) throws jvn.JvnException {
+	        try {
+	            JvnObject remoteJo = coord.jvnLookupObject(jon, this);
+	            if (remoteJo == null) return null;
+	            int id = remoteJo.jvnGetObjectId();
+	            Serializable state = remoteJo.jvnGetSharedObject();
+	            JvnObjectImpl local = new JvnObjectImpl(id, state, this);
+	            local.setLocalLockState(JvnObjectImpl.LockState.RC);
+	            localObjects.put(id, local);
+	            return JvnProxyFactory.createProxy(local, iface);
+	        } catch (Exception e) {
+	            throw new jvn.JvnException("jvnLookupProxy: " + e.getMessage());
+	        }
+	    }
+	 
+	 
+	 public <T> T jvnCreateRegisterProxy(String name, Serializable real, Class<T> iface) throws jvn.JvnException {
+	        T proxy = jvnCreateProxy(real, iface);
+	       
+	        for (JvnObjectImpl impl : localObjects.values()) {
+	            try {
+	                if (impl.jvnGetSharedObject() == real) {
+	                    jvnRegisterObject(name, impl);
+	                    return proxy;
+	                }
+	            } catch (JvnException e) {
+	                // continue
+	            }
+	        }
+	        throw new jvn.JvnException("jvnCreateRegisterProxy: could not register object");
+	    }
 
 }
 
