@@ -247,7 +247,7 @@ public class JvnServerImpl
 	        }
 	        JvnObjectImpl impl = localObjects.get(id);
 	        if (impl == null) throw new jvn.JvnException("internal error: created object not found");
-	        impl.setLocalLockState(JvnObjectImpl.LockState.WC);
+	        //impl.setLocalLockState(JvnObjectImpl.LockState.RC);
 	        return JvnProxyFactory.createProxy(impl, iface);
 	    }
 	 
@@ -260,7 +260,7 @@ public class JvnServerImpl
 	            int id = remoteJo.jvnGetObjectId();
 	            Serializable state = remoteJo.jvnGetSharedObject();
 	            JvnObjectImpl local = new JvnObjectImpl(id, state, this);
-	            local.setLocalLockState(JvnObjectImpl.LockState.RC);
+	           // local.setLocalLockState(JvnObjectImpl.LockState.RC);
 	            localObjects.put(id, local);
 	            return JvnProxyFactory.createProxy(local, iface);
 	        } catch (Exception e) {

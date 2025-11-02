@@ -50,6 +50,11 @@ public class JvnCoordImpl
 	}
 	
 	 public static void main(String[] args) {
+		 
+		 System.setProperty("java.rmi.server.hostname", "localhost");
+		 System.setProperty("java.rmi.server.logCalls", "false");
+		 System.setProperty("sun.rmi.transport.tcp.maxConnectionThreads", "50");
+
 	        try {
 	            new JvnCoordImpl();
 	            System.out.println("[JvnCoord] Prêt.");
