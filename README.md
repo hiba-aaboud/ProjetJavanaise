@@ -83,21 +83,44 @@ Chaque client peut créer, lire, et modifier les mêmes objets partagés simulta
 ---
 
 ### 3️ Exécuter les tests de cohérence
-Le projet contient plusieurs tests :
+Le projet contient plusieurs tests voici un example de flow pour tester la version 1, on a aussi d'autre pour tester le proxy
 
-####  **BurstRunner**
-Teste la cohérence sous forte charge concurrente (multi-threads / multi-serveurs) :
+####  **TestCreateRegister**
+Cree un registre RMI :
 ```bash
-java test.BurstRunner
+java test.TestCreateRegister
 ```
 Output :
 ```
-Committed writes: 22282
-Final counter:    22282
- OK — cohérence préservée
+[JvnServer] Connected to JvnCoord
+id object = 1name object = MyObject[JVM1] créé et enregistré MyObject
 ```
-
-
+####  **TestLookupRead**
+Output :
+```
+[JvnServer] Connected to JvnCoord
+etat lock inital :NL
+id de notre objet read1
+valeur du local hello :
+valeur du local state :Mon Objet Partagé(hello word-from-JVM1)
+valeur du local reader :jvn.JvnObjectImpl@65e579dc
+etat lock final read :R
+got lock read
+[JVM2] lecture objet: hello word-from-JVM1
+```
+####  **TestWriteThenReadCache**
+Output :
+```
+[JvnServer] Connected to JvnCoord
+etat lock write :NL
+id de notre objet1
+valeur du local :jvn.JvnObjectImpl@65e579dc
+etat lock write final :W
+got lock read hello word-from-JVM1
+[JVM3] jvnLockWrite obtenu, new value = Modifie par JVM3
+[JVM3] write terminé, jvnUnLock()
+[JVM3] etat lock 
+```
 
 ---
 
