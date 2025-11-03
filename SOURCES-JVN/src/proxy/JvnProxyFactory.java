@@ -9,17 +9,17 @@ import jvn.*;
 
 public class JvnProxyFactory {
 
-	@SuppressWarnings("unchecked")
-	public static <T> T createProxy(JvnObjectImpl jvnObject, Class<T> iface) {
+    @SuppressWarnings("unchecked")
+    public static <T> T createProxy(JvnObjectImpl jvnObject, Class<T> iface) {
         return (T) Proxy.newProxyInstance(
                 iface.getClassLoader(),
                 new Class<?>[] { iface },
                 new JvnInvocationHandler(jvnObject)
         );
     }
-	
-	
-	public static Object createProxyForObject(JvnObjectImpl jvnObject) {
+
+
+    public static Object createProxyForObject(JvnObjectImpl jvnObject) {
         try {
             Object real = jvnObject.jvnGetSharedObject();
             if (real == null) return null;

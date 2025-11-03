@@ -11,7 +11,7 @@ import jvn.JvnObjectImpl;
 
 public class JvnInvocationHandler implements InvocationHandler {
 
-	private final JvnObjectImpl jvnObject;
+    private final JvnObjectImpl jvnObject;
 
     public JvnInvocationHandler(JvnObjectImpl jvnObject) {
         this.jvnObject = jvnObject;
@@ -24,12 +24,12 @@ public class JvnInvocationHandler implements InvocationHandler {
         if (name.startsWith("get") || name.startsWith("is")) return true;
         return false; // conservateur -> write si indéterminé
     }
-	
-	
-	@Override
-	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-		// TODO Auto-generated method stub
-		boolean read = isRead(method);
+
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        // TODO Auto-generated method stub
+        boolean read = isRead(method);
         // Acquire lock (JvnObjectImpl gère sa propre synchronisation interne)
         if (read) {
             jvnObject.jvnLockRead();
@@ -43,14 +43,14 @@ public class JvnInvocationHandler implements InvocationHandler {
                 // improbable dans un usage normal, mais on protège
                 throw new IllegalStateException("Shared object is null for JVN object id " + jvnObject.jvnGetObjectId());
             }
-            
+
             try {
                 return method.invoke(real, args);
             } catch (InvocationTargetException ite) {
                 throw ite.getCause();
             }
         } finally {
-        	 jvnObject.jvnUnLock();
+            jvnObject.jvnUnLock();
         }
     }
 

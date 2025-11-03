@@ -29,9 +29,10 @@ public class TestWriteThenReadCache {
         }
         System.out.println("[JVM3] jvnLockWrite obtenu, new value = " + o.getValue());
 
+//        Thread.sleep(120_000);
         jvnO.jvnUnLock();
         System.out.println("[JVM3] write terminé, jvnUnLock()");
         System.out.println("[JVM3] etat lock ");
-        Thread.sleep(60_000);
+
     }
 }
