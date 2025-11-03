@@ -1,4 +1,4 @@
-package client;
+package jvn;
 
 import jvn.*;
 import proxy.JvnProxyFactory;
