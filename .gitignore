@@ -1,7 +1,11 @@
-# Build artifacts
+﻿# Build artifacts
 /out/
 /bin/
 *.class
+
+# IDE
 .idea/
 *.iml
+
+# OS
 .DS_Store
