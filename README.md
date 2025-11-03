@@ -121,7 +121,65 @@ got lock read hello word-from-JVM1
 [JVM3] write terminé, jvnUnLock()
 [JVM3] etat lock 
 ```
+Pour tester le proxy:
+####  **burstProxy**
+Output:
+```
+[JvnServer] Connected to JvnCoord
+id object = 3name object = counter-1762164968495LA VALEUR FINAL o1:jvn.JvnObjectImpl@27082746
+LA VALEUR FINAL o2:jvn.JvnObjectImpl@270421f5
+OBJ IDs: S1=3 S2=3
+etat lock write :NL
+id de notre objet3
+valeur du local :jvn.JvnObjectImpl@270421f5
+etat lock write final :W
+etat lock inital :WC
+etat lock inital :NL
+id de notre objet read3
+id de notre objet read3
+valeur du local hello :
+etat lock final read :RWC
+etat lock inital :RWC
+id de notre objet read3
+etat lock final read :RWC
+etat lock inital :RWC
+id de notre objet read3
+etat lock final read :RWC
+etat lock inital :WC
+id de notre objet read3
+etat lock final read :RWC
+etat lock inital :RWC
+id de notre objet read3
+etat lock final read :RWC
+etat lock inital :WC
+id de notre objet read3
+etat lock final read :RWC
+valeur du local state :Counter(0)
+valeur du local reader :jvn.JvnObjectImpl@270421f5
+etat lock final read :R
+etat lock inital :RC
+id de notre objet read3
+etat lock final read :R
+etat lock inital :RC
+id de notre objet read3
+etat lock final read :R
+etat lock write :RC
+id de notre objet3
+valeur du local :jvn.JvnObjectImpl@270421f5
+etat lock write final :W
+etat lock inital :WC
+id de notre objet read3
+etat lock final read :RWC
+etat lock write :WC
+id de notre objet3
+etat lock write final :W
+LA VALEUR FINAL C2:Counter(1)
+LA VALEUR commited commited:1
+Committed writes: 1
+Final counter:   1
+ OK — cached version passed!
 
+```
 ---
 
 ##  Exemple d’utilisation (Client CLI)
